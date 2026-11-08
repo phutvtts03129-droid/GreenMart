@@ -1,0 +1,519 @@
+<%@ page pageEncoding="UTF-8" %>
+<%-- ===================== NHÂN VẬT MILK + KHUNG CHAT AI + QUÉT VÙNG MÀN HÌNH ===================== --%>
+<style>
+#aiChat{
+  --ai-g1:#00b35a; --ai-g2:#8be04e; --ai-gd:#0b7a3d; --ai-or:#ff7a00;
+  --ai-ink:#16301f; --ai-mut:#5f7d67; --ai-soft:#f0fbec; --ai-line:#cfeac8;
+}
+
+/* =====================================================
+   NHÂN VẬT MILK
+   ===================================================== */
+#aiBot{position:fixed;left:0;top:0;width:88px;height:150px;z-index:2070;cursor:pointer;
+  transform:translate(-200px,-200px);transition:transform .52s cubic-bezier(.45,.05,.4,1);
+  will-change:transform;-webkit-tap-highlight-color:transparent;user-select:none;outline:0}
+#aiBot .bot-body{position:relative;width:100%;height:100%;transform-origin:50% 100%;animation:aiFloat 3s ease-in-out infinite}
+#aiBot img{display:block;width:100%;height:100%;object-fit:contain;pointer-events:none;-webkit-user-drag:none;
+  filter:drop-shadow(0 10px 14px rgba(0,70,35,.38)) drop-shadow(0 0 14px rgba(139,224,78,.55))}
+#aiBot .bot-shadow{position:absolute;left:14%;right:14%;bottom:-6px;height:12px;border-radius:50%;background:rgba(0,40,20,.3);filter:blur(4px)}
+#aiBot:focus-visible .bot-body{outline:3px solid var(--ai-or);outline-offset:4px;border-radius:24px}
+
+@keyframes aiFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
+@keyframes aiJump{0%{transform:scale(1,1)}14%{transform:scale(1.14,.84)}45%{transform:translateY(-70px) scale(.92,1.1) rotate(-8deg)}72%{transform:translateY(0) scale(1.12,.86)}88%{transform:scale(.97,1.04)}100%{transform:scale(1,1)}}
+@keyframes aiHop{0%{transform:scale(1,1)}18%{transform:scale(1.1,.88)}50%{transform:translateY(-64px) scale(.95,1.06) rotate(calc(var(--dir,1) * 10deg))}82%{transform:translateY(0) scale(1.08,.9)}100%{transform:scale(1,1)}}
+@keyframes aiSpin{0%{transform:translateY(0) rotate(0)}50%{transform:translateY(-72px) rotate(180deg)}100%{transform:translateY(0) rotate(360deg)}}
+@keyframes aiWiggle{0%,100%{transform:rotate(0)}20%{transform:rotate(-11deg)}40%{transform:rotate(10deg)}60%{transform:rotate(-7deg)}80%{transform:rotate(5deg)}}
+@keyframes aiShadow{50%{transform:scale(.55);opacity:.45}}
+#aiBot .bot-body.jump{animation:aiJump .85s ease-out}
+#aiBot .bot-body.hop{animation:aiHop .54s ease-in-out}
+#aiBot .bot-body.spin{animation:aiSpin .9s ease-in-out}
+#aiBot .bot-body.wiggle{animation:aiWiggle .7s ease-in-out}
+#aiBot[data-act="hop"] .bot-shadow,#aiBot[data-act="jump"] .bot-shadow,#aiBot[data-act="spin"] .bot-shadow{animation:aiShadow .6s ease-in-out}
+
+/* bóng nói */
+#aiBot .bot-say{position:absolute;right:-8px;bottom:calc(100% + 4px);width:max-content;max-width:190px;padding:9px 14px;
+  background:#fff;color:var(--ai-ink);font-size:.84rem;font-weight:600;line-height:1.35;text-align:center;
+  border:2px solid var(--ai-g2);border-radius:16px;box-shadow:0 10px 24px rgba(0,100,50,.28);
+  transform-origin:80% 100%;transform:scale(0);opacity:0;transition:transform .3s cubic-bezier(.34,1.56,.64,1),opacity .2s;pointer-events:none}
+#aiBot .bot-say::after{content:"";position:absolute;right:30px;bottom:-9px;width:14px;height:14px;background:#fff;border-right:2px solid var(--ai-g2);border-bottom:2px solid var(--ai-g2);transform:rotate(45deg)}
+#aiBot .bot-say.show{transform:scale(1);opacity:1}
+
+/* tia sáng khi bấm */
+#aiBot .bot-sp{position:absolute;left:50%;top:40%;font-size:1.25rem;pointer-events:none;animation:aiSp .85s ease-out forwards}
+@keyframes aiSp{from{transform:translate(-50%,-50%) scale(.4);opacity:1}to{transform:translate(calc(-50% + var(--dx)),calc(-50% + var(--dy))) scale(1.25);opacity:0}}
+
+/* =====================================================
+   KHUNG CHAT (luôn sáng, nổi bật cả ở chế độ tối)
+   ===================================================== */
+#aiPanel{position:fixed;right:22px;bottom:22px;width:400px;height:min(640px,calc(100vh - 44px));z-index:2060;
+  display:flex;flex-direction:column;overflow:hidden;border-radius:28px;background:#fff;color:var(--ai-ink);
+  border:3px solid #fff;
+  box-shadow:0 0 0 3px rgba(139,224,78,.7),0 30px 70px rgba(0,120,60,.38),0 0 70px rgba(139,224,78,.5);
+  opacity:0;visibility:hidden;transform:translateY(30px) scale(.6);transform-origin:90% 100%;
+  transition:opacity .25s,transform .5s cubic-bezier(.34,1.56,.64,1),visibility .5s}
+#aiChat.open #aiPanel{opacity:1;visibility:visible;transform:none}
+
+#aiPanel header{position:relative;display:flex;align-items:center;gap:12px;padding:16px 14px 16px 16px;color:#fff;overflow:hidden;
+  background:linear-gradient(120deg,#00a651 0%,#2cc863 55%,#9be24f 100%)}
+#aiPanel header::before{content:"";position:absolute;width:150px;height:150px;border-radius:50%;background:rgba(255,255,255,.18);right:-40px;top:-70px}
+#aiPanel header::after{content:"";position:absolute;width:90px;height:90px;border-radius:50%;background:rgba(255,255,255,.14);left:40%;bottom:-60px}
+.ai-av{position:relative;z-index:1;width:48px;height:48px;border-radius:50%;flex-shrink:0;background:linear-gradient(160deg,#fff,#d9f7d0);
+  border:3px solid #fff;box-shadow:0 4px 12px rgba(0,60,30,.3);overflow:hidden}
+.ai-av img{width:100%;height:100%;object-fit:cover;object-position:50% 6%;transform:scale(1.35);transform-origin:50% 22%}
+.ai-ht{position:relative;z-index:1;flex:1;min-width:0;line-height:1.25}
+.ai-ht b{display:block;font-size:1.08rem;font-weight:800;text-shadow:0 1px 6px rgba(0,60,30,.3)}
+.ai-ht small{display:flex;align-items:center;gap:6px;font-size:.76rem;font-weight:600;opacity:.96}
+.ai-ht small::before{content:"";width:9px;height:9px;border-radius:50%;background:#c8ff7a;box-shadow:0 0 0 3px rgba(200,255,122,.35),0 0 10px #c8ff7a;animation:aiLive 1.8s infinite}
+@keyframes aiLive{50%{box-shadow:0 0 0 6px rgba(200,255,122,0),0 0 10px #c8ff7a}}
+#aiPanel header button{position:relative;z-index:1;width:34px;height:34px;border-radius:12px;border:0;background:rgba(255,255,255,.24);color:#fff;transition:.2s}
+#aiPanel header button:hover{background:rgba(255,255,255,.5);transform:scale(1.08)}
+
+#aiMsgs{flex:1;overflow-y:auto;padding:16px 14px;display:flex;flex-direction:column;gap:12px;scroll-behavior:smooth;
+  background:radial-gradient(circle at 12% 8%,rgba(139,224,78,.22),transparent 38%),radial-gradient(circle at 92% 92%,rgba(0,179,90,.14),transparent 40%),linear-gradient(180deg,#f7fff3,#ecf9e7)}
+.ai-row{display:flex;align-items:flex-end;gap:8px;animation:aiIn .3s ease-out}
+.ai-row.user{justify-content:flex-end}
+@keyframes aiIn{from{opacity:0;transform:translateY(10px)}}
+.ai-ava{width:30px;height:30px;border-radius:50%;flex-shrink:0;object-fit:cover;object-position:50% 6%;background:linear-gradient(160deg,#fff,#d9f7d0);
+  border:2px solid var(--ai-g2);box-shadow:0 3px 8px rgba(0,100,50,.25)}
+.ai-m{max-width:80%;padding:10px 14px;border-radius:18px;font-size:.92rem;line-height:1.55;word-wrap:break-word;overflow-wrap:anywhere}
+.ai-m.bot{background:#fff;color:var(--ai-ink);border:1.5px solid var(--ai-line);border-bottom-left-radius:6px;box-shadow:0 4px 14px rgba(0,120,60,.1)}
+.ai-m.user{color:#fff;background:linear-gradient(135deg,#00b35a,#4fd05f);border-bottom-right-radius:6px;box-shadow:0 6px 16px rgba(0,179,90,.35)}
+.ai-m.err{background:#fff4f2;border-color:#ff8a80;color:#c62828}
+.ai-m img{display:block;max-width:100%;max-height:170px;border-radius:12px;margin-bottom:8px;border:2px solid rgba(255,255,255,.75);cursor:zoom-in}
+.ai-m.bot img{border-color:var(--ai-line)}
+.ai-typing{display:inline-flex;gap:5px;padding:5px 2px}
+.ai-typing i{width:8px;height:8px;border-radius:50%;background:var(--ai-g1);animation:aiDot 1.1s infinite}
+.ai-typing i:nth-child(2){animation-delay:.18s;background:#4fd05f}.ai-typing i:nth-child(3){animation-delay:.36s;background:var(--ai-g2)}
+@keyframes aiDot{0%,60%,100%{transform:translateY(0);opacity:.45}30%{transform:translateY(-6px);opacity:1}}
+
+#aiChips{display:flex;gap:8px;overflow-x:auto;padding:10px 14px 8px;background:#ecf9e7;scrollbar-width:none}
+#aiChips::-webkit-scrollbar{display:none}
+#aiChips button{flex-shrink:0;border:1.5px solid var(--ai-g2);background:#fff;color:var(--ai-gd);border-radius:50px;padding:6px 14px;font-size:.8rem;font-weight:700;transition:.2s;box-shadow:0 3px 8px rgba(0,120,60,.1)}
+#aiChips button:hover{background:linear-gradient(120deg,#00b35a,#6fd44f);color:#fff;border-color:transparent;transform:translateY(-2px)}
+
+#aiPrev{display:none;align-items:center;gap:10px;padding:8px 14px;background:#fff7e8;border-top:2px dashed #ffc98a}
+#aiPrev.show{display:flex}
+#aiPrev img{height:46px;max-width:90px;object-fit:cover;border-radius:10px;border:2px solid var(--ai-or)}
+#aiPrev span{flex:1;font-size:.8rem;font-weight:600;color:#8a4b00}
+#aiPrev button{border:0;background:transparent;color:#b46a1a;font-size:1.15rem}
+#aiPrev button:hover{color:#e53935}
+
+.ai-input{display:flex;align-items:flex-end;gap:8px;padding:12px 12px 14px;background:#fff;border-top:2px solid var(--ai-line)}
+.ai-input .ib{width:40px;height:40px;flex-shrink:0;border-radius:13px;border:0;background:#e4f7dc;color:var(--ai-gd);font-size:1.1rem;transition:.2s}
+.ai-input .ib:hover{background:var(--ai-g1);color:#fff;transform:translateY(-2px)}
+#aiText{flex:1;resize:none;max-height:110px;border:2px solid var(--ai-line);border-radius:15px;padding:9px 13px;font:inherit;font-size:.92rem;background:#f7fff3;color:var(--ai-ink);outline:0;transition:border-color .2s,box-shadow .2s}
+#aiText::placeholder{color:#8aa592}
+#aiText:focus{border-color:var(--ai-g1);box-shadow:0 0 0 4px rgba(0,179,90,.16);background:#fff}
+#aiSend{width:44px;height:44px;flex-shrink:0;border-radius:50%;border:0;background:linear-gradient(135deg,#ff9a1f,#ff6a00);color:#fff;font-size:1.05rem;box-shadow:0 6px 16px rgba(255,106,0,.45);transition:.2s}
+#aiSend:hover{transform:scale(1.1) rotate(-8deg)}
+#aiSend:disabled{opacity:.5;transform:none;cursor:not-allowed}
+#aiPanel button:focus-visible,#aiText:focus-visible{outline:3px solid var(--ai-or);outline-offset:2px}
+
+/* =====================================================
+   LỚP QUÉT VÙNG MÀN HÌNH
+   ===================================================== */
+#aiSel{position:fixed;inset:0;z-index:3000;cursor:crosshair;background:rgba(0,0,0,.38);touch-action:none;user-select:none}
+#aiSel.drag{background:transparent}
+#aiSel .hint{position:absolute;top:18px;left:50%;transform:translateX(-50%);background:#0b7a3d;color:#fff;padding:10px 20px;border-radius:50px;font-size:.9rem;font-weight:600;box-shadow:0 8px 24px rgba(0,0,0,.35);white-space:nowrap;max-width:94vw;overflow:hidden;text-overflow:ellipsis}
+#aiSel.drag .hint{opacity:0}
+#aiSel .box{position:absolute;border:2px dashed #fff;outline:2px solid var(--ai-or,#ff7a00);box-shadow:0 0 0 9999px rgba(0,0,0,.52);display:none}
+#aiSel .size{position:absolute;right:0;bottom:-28px;background:#ff7a00;color:#fff;font-size:.72rem;font-weight:700;padding:2px 8px;border-radius:8px}
+
+/* Điện thoại: khung chiếm toàn màn hình */
+@media(max-width:575px){
+  #aiPanel{right:0;bottom:0;width:100%;height:100%;border-radius:0;border:0}
+}
+@media(prefers-reduced-motion:reduce){
+  #aiBot .bot-body{animation:none!important}
+  #aiPanel,.ai-row{transition:none;animation:none}
+}
+</style>
+
+<div id="aiChat">
+  <!-- Nhân vật: bấm vào để mở chat -->
+  <div id="aiBot" role="button" tabindex="0" aria-label="Mở trợ lý AI Milk">
+    <div class="bot-say" id="aiSay"></div>
+    <div class="bot-shadow"></div>
+    <div class="bot-body"><img src="${pageContext.request.contextPath}/images/robot-milk.png" alt="Milk, trợ lý AI"></div>
+  </div>
+
+  <section id="aiPanel" aria-label="Trợ lý AI" aria-hidden="true">
+    <header>
+      <div class="ai-av"><img src="${pageContext.request.contextPath}/images/robot-milk.png" alt=""></div>
+      <div class="ai-ht"><b>Milk</b><small>Trợ lý Nông Sản Xanh, đang online</small></div>
+      <button id="aiClear" type="button" title="Cuộc trò chuyện mới" aria-label="Cuộc trò chuyện mới"><i class="bi bi-arrow-counterclockwise"></i></button>
+      <button id="aiClose" type="button" title="Đóng" aria-label="Đóng"><i class="bi bi-x-lg"></i></button>
+    </header>
+
+    <div id="aiMsgs" aria-live="polite"></div>
+
+    <div id="aiChips">
+      <button type="button">Gợi ý thực đơn cho gia đình 4 người</button>
+      <button type="button">Cách bảo quản rau xanh lâu hơn</button>
+      <button type="button">Combo nào hợp cho bé ăn dặm?</button>
+      <button type="button">Phí giao hàng tính thế nào?</button>
+    </div>
+
+    <div id="aiPrev"><img alt="Ảnh đã chọn"><span>Đã chọn vùng ảnh. Nhập câu hỏi rồi gửi.</span><button type="button" id="aiPrevX" aria-label="Bỏ ảnh"><i class="bi bi-x-circle-fill"></i></button></div>
+
+    <div class="ai-input">
+      <button class="ib" id="aiScan" type="button" title="Kéo chọn vùng trên màn hình để hỏi" aria-label="Quét vùng màn hình"><i class="bi bi-crop"></i></button>
+      <button class="ib" id="aiUp" type="button" title="Tải ảnh lên" aria-label="Tải ảnh lên"><i class="bi bi-image"></i></button>
+      <input type="file" id="aiFile" accept="image/*" hidden>
+      <textarea id="aiText" rows="1" maxlength="2000" placeholder="Nhập câu hỏi..."></textarea>
+      <button id="aiSend" type="button" aria-label="Gửi"><i class="bi bi-send-fill"></i></button>
+    </div>
+  </section>
+</div>
+
+<script>
+(function(){
+  var CTX      = '${pageContext.request.contextPath}';
+  var ENDPOINT = CTX + '/chat-ai';
+  var BOT_IMG  = CTX + '/images/robot-milk.png';
+  var H2C_URL  = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+  var MAX_SIDE = 1280;
+
+  var $ = function(id){ return document.getElementById(id); };
+  var chat=$('aiChat'), msgs=$('aiMsgs'), txt=$('aiText'), sendBtn=$('aiSend');
+  var prev=$('aiPrev'), prevImg=prev.querySelector('img'), chips=$('aiChips');
+  var attached=null, busy=false, history=[];
+
+  function note(m){ if(window.toast) window.toast(m); }
+  var reduced = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function isMobile(){ return window.innerWidth<=575; }
+  function rnd(a,b){ return a+Math.random()*(b-a); }
+
+  /* =====================================================
+     NHÂN VẬT MILK: bấm -> nhảy -> mở chat -> nhảy nhót trên trang
+     ===================================================== */
+  var bot=$('aiBot'), body=bot.querySelector('.bot-body'), bubble=$('aiSay');
+  var BW=88, BH=150;
+  var cx=0, cy=0, opened=false, roaming=false, roamT=null, playT=null, sayT=null, tipT=null;
+
+  function place(x,y,ms){
+    bot.style.transitionDuration=(ms||0)+'ms';
+    bot.style.transform='translate('+Math.round(x)+'px,'+Math.round(y)+'px)';
+    cx=x; cy=y;
+  }
+  function home(){ return { x:window.innerWidth-BW-22, y:window.innerHeight-BH-76 }; }
+
+  function play(n){
+    body.classList.remove('jump','hop','spin','wiggle');
+    void body.offsetWidth;
+    body.classList.add(n); bot.dataset.act=n;
+    clearTimeout(playT);
+    playT=setTimeout(function(){ body.classList.remove(n); bot.dataset.act=''; },950);
+  }
+  function speak(t,ms){
+    bubble.textContent=t; bubble.classList.add('show');
+    clearTimeout(sayT); sayT=setTimeout(function(){ bubble.classList.remove('show'); },ms||2600);
+  }
+  function burst(){
+    var em=['\u2728','\u2B50','\uD83D\uDC9A','\uD83E\uDD55','\uD83C\uDF45','\uD83E\uDD6C','\u2728','\uD83C\uDF4B'];
+    for(var i=0;i<em.length;i++){
+      (function(i){
+        var s=document.createElement('span'); s.className='bot-sp'; s.textContent=em[i];
+        var a=i/em.length*Math.PI*2;
+        s.style.setProperty('--dx',Math.round(Math.cos(a)*78)+'px');
+        s.style.setProperty('--dy',Math.round(Math.sin(a)*78-26)+'px');
+        bot.appendChild(s); setTimeout(function(){ if(s.parentNode) s.parentNode.removeChild(s); },900);
+      })(i);
+    }
+  }
+
+  /* nhảy từng bước tới (x,y) */
+  function hopTo(x,y,cb){
+    var sx=cx, sy=cy, dx=x-sx, dy=y-sy, d=Math.sqrt(dx*dx+dy*dy);
+    var n=Math.max(1,Math.min(4,Math.round(d/230))), i=0;
+    body.style.setProperty('--dir',dx>=0?1:-1);
+    (function next(){
+      i++;
+      place(sx+dx*i/n, sy+dy*i/n, 520);
+      play('hop');
+      setTimeout(i<n ? next : (cb||function(){}), 560);
+    })();
+  }
+
+  /* chọn điểm đáp: bên trái khung chat, hoặc đứng trên mép khung */
+  function pickTarget(){
+    var W=window.innerWidth, H=window.innerHeight;
+    var pw=Math.min(400,W-44), ph=Math.min(640,H-44);
+    var pl=W-22-pw, pt=H-22-ph;
+    var maxX=pl-BW-14;
+    var canPerch = pt>BH-10;
+    if(canPerch && (Math.random()<.28 || maxX<40)){
+      return { x: pl+10+Math.random()*Math.max(10,pw-BW-130), y: pt-BH+24, perch:true };
+    }
+    if(maxX<30) return { x: pl+10, y: pt-BH+24, perch:true };
+    return { x: rnd(16,maxX), y: rnd(70,Math.max(80,H-BH-24)), perch:false };
+  }
+  var LINES=['Hihi! \uD83D\uDE04','Mình ở đây nè!','Bạn cần gì cứ hỏi nhé','Rau củ hôm nay tươi lắm!','Kéo chọn vùng rồi hỏi mình nha','Nhảy nhảy nhảy ~'];
+
+  function step(){
+    if(!roaming) return;
+    if(document.hidden || txt.value.length>0){ roamT=setTimeout(step,1500); return; }  // đang gõ thì đứng yên
+    var t=pickTarget();
+    hopTo(t.x,t.y,function(){
+      if(!roaming) return;
+      var r=Math.random();
+      if(r<.28) play('wiggle'); else if(r<.42) play('spin');
+      if(Math.random()<.35) speak(LINES[Math.floor(Math.random()*LINES.length)],2200);
+      roamT=setTimeout(step, rnd(1300,3200));
+    });
+  }
+  function startRoam(){ if(roaming||reduced||isMobile()) return; roaming=true; roamT=setTimeout(step,900); }
+  function stopRoam(){ roaming=false; clearTimeout(roamT); }
+
+  function goHome(quiet){
+    var h=home();
+    if(quiet){ place(h.x,h.y,0); return; }
+    hopTo(h.x,h.y,function(){ speak('Cần gì cứ gọi mình nhé! \uD83D\uDC4B',2600); });
+  }
+
+  /* ---------- mở / đóng ---------- */
+  function openChat(){
+    if(opened) return;
+    opened=true; clearInterval(tipT);
+    play('jump'); burst(); speak('Chào bạn! \uD83D\uDC4B',1600);
+    setTimeout(function(){
+      chat.classList.add('open'); $('aiPanel').setAttribute('aria-hidden','false');
+      if(isMobile()) bot.style.visibility='hidden'; else startRoam();
+      setTimeout(function(){ txt.focus(); },450);
+    },430);
+  }
+  function closeChat(quiet){
+    if(!opened) return;
+    opened=false; stopRoam();
+    chat.classList.remove('open'); $('aiPanel').setAttribute('aria-hidden','true');
+    bot.style.visibility='';
+    goHome(quiet);
+    startTips();
+  }
+  function onBot(){
+    if(!opened){ openChat(); return; }
+    play(Math.random()<.5?'spin':'jump'); burst();
+    speak(LINES[Math.floor(Math.random()*LINES.length)],2000);
+  }
+  bot.addEventListener('click',onBot);
+  bot.addEventListener('keydown',function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); onBot(); } });
+  $('aiClose').addEventListener('click',function(){ closeChat(false); });
+
+  /* lời chào định kỳ khi đang đóng */
+  var TIPS=['Cần mình giúp gì không? \uD83D\uDC4B','Bấm vào mình để chat nè!','Chọn vùng trên trang rồi hỏi mình nhé','Hỏi mình cách bảo quản rau nha \uD83E\uDD6C'];
+  function startTips(){
+    clearInterval(tipT);
+    tipT=setInterval(function(){
+      if(opened||document.hidden) return;
+      play('wiggle'); speak(TIPS[Math.floor(Math.random()*TIPS.length)],3000);
+    },14000);
+  }
+
+  /* nhân vật chạy vào lúc tải trang */
+  (function intro(){
+    var h=home();
+    place(window.innerWidth+40,h.y,0);
+    setTimeout(function(){
+      hopTo(h.x,h.y,function(){ play('wiggle'); speak('Xin chào! Mình là Milk \uD83D\uDE04',3500); startTips(); });
+    },1100);
+  })();
+  window.addEventListener('resize',function(){ if(!opened){ var h=home(); place(h.x,h.y,0); } });
+
+  /* =====================================================
+     HIỂN THỊ TIN NHẮN
+     ===================================================== */
+  function fmt(s){
+    s=String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    s=s.replace(/\*\*(.+?)\*\*/g,'<b>$1</b>');
+    s=s.replace(/^\s*[-*]\s+(.+)$/gm,'\u2022 $1');
+    s=s.replace(/^#+\s*(.+)$/gm,'<b>$1</b>');
+    return s.replace(/\n/g,'<br>');
+  }
+  function avatar(){ var a=document.createElement('img'); a.className='ai-ava'; a.src=BOT_IMG; a.alt=''; return a; }
+  function add(role,text,img,isErr){
+    var row=document.createElement('div'); row.className='ai-row '+role;
+    if(role==='bot') row.appendChild(avatar());
+    var d=document.createElement('div'); d.className='ai-m '+role+(isErr?' err':'');
+    if(img){ var im=document.createElement('img'); im.src=img; im.alt='Ảnh đã gửi'; im.addEventListener('click',function(){ window.open(img,'_blank'); }); d.appendChild(im); }
+    var sp=document.createElement('div'); sp.innerHTML=fmt(text); d.appendChild(sp);
+    row.appendChild(d);
+    msgs.appendChild(row); msgs.scrollTop=msgs.scrollHeight;
+    return row;
+  }
+  function typing(){
+    var row=document.createElement('div'); row.className='ai-row bot';
+    row.appendChild(avatar());
+    var d=document.createElement('div'); d.className='ai-m bot';
+    d.innerHTML='<span class="ai-typing"><i></i><i></i><i></i></span>';
+    row.appendChild(d);
+    msgs.appendChild(row); msgs.scrollTop=msgs.scrollHeight; return row;
+  }
+  function welcome(){
+    msgs.innerHTML=''; history=[]; setAttach(null);
+    add('bot','Xin chào! Mình là **Milk**, trợ lý của **Nông Sản Xanh** \uD83E\uDD6C\nBạn cứ hỏi trực tiếp, hoặc bấm nút cắt ảnh bên dưới để **kéo chọn một vùng trên trang** (sản phẩm, giá, combo...) rồi hỏi về vùng đó nhé.');
+    chips.style.display='';
+  }
+  $('aiClear').addEventListener('click',welcome);
+  chips.querySelectorAll('button').forEach(function(b){ b.addEventListener('click',function(){ txt.value=b.textContent; send(); }); });
+
+  /* =====================================================
+     ẢNH ĐÍNH KÈM
+     ===================================================== */
+  function setAttach(url){
+    attached=url;
+    if(url){ prevImg.src=url; prev.classList.add('show'); } else { prev.classList.remove('show'); prevImg.removeAttribute('src'); }
+  }
+  $('aiPrevX').addEventListener('click',function(){ setAttach(null); });
+
+  function toJpeg(src,w,h){
+    var r=Math.min(1,MAX_SIDE/Math.max(w,h));
+    var c=document.createElement('canvas'); c.width=Math.max(1,Math.round(w*r)); c.height=Math.max(1,Math.round(h*r));
+    var g=c.getContext('2d'); g.fillStyle='#fff'; g.fillRect(0,0,c.width,c.height);
+    g.drawImage(src,0,0,w,h,0,0,c.width,c.height);
+    return c.toDataURL('image/jpeg',.85);
+  }
+
+  $('aiUp').addEventListener('click',function(){ $('aiFile').click(); });
+  $('aiFile').addEventListener('change',function(){
+    var f=this.files[0]; this.value='';
+    if(!f) return;
+    if(!/^image\//.test(f.type)){ note('Vui lòng chọn file ảnh'); return; }
+    var url=URL.createObjectURL(f), im=new Image();
+    im.onload=function(){ setAttach(toJpeg(im,im.naturalWidth,im.naturalHeight)); URL.revokeObjectURL(url); txt.focus(); };
+    im.onerror=function(){ note('Không đọc được ảnh'); };
+    im.src=url;
+  });
+
+  txt.addEventListener('paste',function(e){
+    var items=(e.clipboardData||{}).items||[];
+    for(var i=0;i<items.length;i++){
+      if(items[i].type.indexOf('image')===0){
+        var f=items[i].getAsFile(), url=URL.createObjectURL(f), im=new Image();
+        im.onload=function(){ setAttach(toJpeg(im,im.naturalWidth,im.naturalHeight)); URL.revokeObjectURL(url); };
+        im.src=url; e.preventDefault(); return;
+      }
+    }
+  });
+
+  /* =====================================================
+     QUÉT VÙNG MÀN HÌNH
+     ===================================================== */
+  var h2cPromise=null;
+  function loadH2C(){
+    if(window.html2canvas) return Promise.resolve();
+    if(h2cPromise) return h2cPromise;
+    h2cPromise=new Promise(function(ok,fail){
+      var s=document.createElement('script'); s.src=H2C_URL;
+      s.onload=ok; s.onerror=function(){ h2cPromise=null; fail(new Error('Không tải được thư viện quét ảnh')); };
+      document.head.appendChild(s);
+    });
+    return h2cPromise;
+  }
+
+  function startScan(){
+    loadH2C().catch(function(){});
+    closeChat(true);                       // ẩn khung chat, nhân vật về chỗ cũ (không hiệu ứng)
+
+    var ov=document.createElement('div'); ov.id='aiSel';
+    ov.innerHTML='<div class="hint">Kéo chuột (hoặc ngón tay) để chọn vùng cần hỏi. Nhấn Esc để hủy.</div><div class="box"><span class="size"></span></div>';
+    document.body.appendChild(ov);
+    var box=ov.querySelector('.box'), size=ov.querySelector('.size');
+    var sx=0, sy=0, drawing=false, rect=null;
+
+    function cleanup(){ document.removeEventListener('keydown',onKey,true); if(ov.parentNode) ov.parentNode.removeChild(ov); }
+    function cancel(){ cleanup(); openChat(); }
+    function onKey(e){ if(e.key==='Escape'){ e.preventDefault(); cancel(); } }
+    document.addEventListener('keydown',onKey,true);
+    ov.addEventListener('contextmenu',function(e){ e.preventDefault(); cancel(); });
+
+    ov.addEventListener('pointerdown',function(e){
+      if(e.button>0) return;
+      drawing=true; sx=e.clientX; sy=e.clientY; rect=null;
+      ov.classList.add('drag'); box.style.display='block';
+      ov.setPointerCapture(e.pointerId); e.preventDefault();
+    });
+    ov.addEventListener('pointermove',function(e){
+      if(!drawing) return;
+      var x=Math.min(sx,e.clientX), y=Math.min(sy,e.clientY), w=Math.abs(e.clientX-sx), h=Math.abs(e.clientY-sy);
+      rect={x:x,y:y,w:w,h:h};
+      box.style.left=x+'px'; box.style.top=y+'px'; box.style.width=w+'px'; box.style.height=h+'px';
+      size.textContent=Math.round(w)+' \u00D7 '+Math.round(h);
+    });
+    ov.addEventListener('pointerup',function(e){
+      if(!drawing) return; drawing=false;
+      if(!rect || rect.w<16 || rect.h<16){ note('Vùng chọn quá nhỏ, hãy kéo lại'); cancel(); return; }
+      capture(rect,cleanup);
+    });
+  }
+
+  function capture(r,cleanup){
+    note('Đang quét vùng đã chọn...');
+    cleanup();
+    bot.style.visibility='hidden';          // giấu Milk để không lọt vào ảnh
+    loadH2C().then(function(){
+      return new Promise(function(res){ requestAnimationFrame(function(){ requestAnimationFrame(res); }); });
+    }).then(function(){
+      var dark=document.documentElement.getAttribute('data-theme')==='dark';
+      var scale=Math.min(window.devicePixelRatio||1,2);
+      return window.html2canvas(document.documentElement,{
+        x:window.scrollX, y:window.scrollY, width:window.innerWidth, height:window.innerHeight,
+        scale:scale, useCORS:true, logging:false,
+        backgroundColor: dark ? '#040b18' : '#fbfdf6',
+        ignoreElements:function(el){ return el.id==='aiChat'||el.id==='aiSel'; }
+      }).then(function(full){
+        var k=full.width/window.innerWidth;
+        var sxp=Math.round(r.x*k), syp=Math.round(r.y*k), sw=Math.round(r.w*k), sh=Math.round(r.h*k);
+        var crop=document.createElement('canvas'); crop.width=sw; crop.height=sh;
+        crop.getContext('2d').drawImage(full,sxp,syp,sw,sh,0,0,sw,sh);
+        setAttach(toJpeg(crop,sw,sh));
+        bot.style.visibility=''; openChat();
+        note('Đã quét xong, hãy nhập câu hỏi');
+      });
+    }).catch(function(err){
+      console.error(err); bot.style.visibility=''; openChat();
+      add('bot','Không quét được vùng này (có thể do ảnh hoặc video từ trang khác chặn). Bạn thử chọn vùng khác, hoặc dùng nút tải ảnh lên nhé.',null,true);
+    });
+  }
+  $('aiScan').addEventListener('click',startScan);
+
+  /* =====================================================
+     GỬI CÂU HỎI
+     ===================================================== */
+  function send(){
+    if(busy) return;
+    var q=txt.value.trim(), img=attached;
+    if(!q && !img) return;
+    var shown = q || 'Hãy mô tả và giải thích vùng ảnh này.';
+
+    add('user',shown,img);
+    txt.value=''; txt.style.height='auto'; setAttach(null); chips.style.display='none';
+    busy=true; sendBtn.disabled=true;
+    var t=typing();
+    if(opened){ play('wiggle'); }
+
+    fetch(ENDPOINT,{
+      method:'POST',
+      headers:{'Content-Type':'application/json; charset=UTF-8'},
+      body:JSON.stringify({message:q, image:img||'', history:history.slice(-10)})
+    }).then(function(r){ return r.json().catch(function(){ return {error:'Phản hồi không hợp lệ từ máy chủ.'}; }); })
+    .then(function(data){
+      t.remove();
+      if(data.reply){
+        add('bot',data.reply);
+        history.push({role:'user',content: img ? shown+' (kèm 1 ảnh chụp từ trang web)' : shown});
+        history.push({role:'assistant',content:data.reply});
+        if(opened){ play('jump'); }
+      } else {
+        add('bot',data.error||'Có lỗi xảy ra, bạn thử lại nhé.',null,true);
+      }
+    }).catch(function(){
+      t.remove(); add('bot','Không kết nối được máy chủ. Bạn kiểm tra mạng rồi thử lại nhé.',null,true);
+    }).then(function(){ busy=false; sendBtn.disabled=false; txt.focus(); });
+  }
+  sendBtn.addEventListener('click',send);
+  txt.addEventListener('keydown',function(e){ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); send(); } });
+  txt.addEventListener('input',function(){ this.style.height='auto'; this.style.height=Math.min(this.scrollHeight,110)+'px'; });
+
+  welcome();
+})();
+</script>
